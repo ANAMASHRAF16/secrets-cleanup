@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+.pytest_cache/
+
+# Local scratch — kept out of repo
+PR_DESCRIPTION.md
+VIDEO_SCRIPT.md
