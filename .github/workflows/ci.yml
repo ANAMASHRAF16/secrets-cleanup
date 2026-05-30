@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests + secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit tests
+        run: pytest tests/ -v
+
+      - name: Hardcoded-secret regression scan (extra grep belt + braces)
+        run: |
+          # Belt-and-braces: even if test_no_hardcoded_secrets.py somehow
+          # silently passes, a plain grep on the known-bad AKIA pattern
+          # outside the documented placeholder will fail the build.
+          if grep -rE 'AKIA[A-Z0-9]{16}' src/ | grep -v 'EXAMPLE'; then
+            echo "::error::Hardcoded AWS access key pattern found in src/"
+            exit 1
+          fi
+          echo "No raw AKIA tokens found in src/."
+
+      - name: Summarise
+        if: always()
+        run: |
+          echo "### Activity 9 — secrets cleanup checks" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Unit tests: see job log above" >> $GITHUB_STEP_SUMMARY
+          echo "- Hardcoded-secret regex scan: see Hardcoded-secret regression scan step" >> $GITHUB_STEP_SUMMARY
