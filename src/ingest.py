@@ -6,8 +6,9 @@ a Postgres analytics database.
 
 Secrets handling:
 - AWS credentials: boto3 default chain (~/.aws/credentials, env, IAM role)
-- Weather API key: WEATHER_API_KEY env var (low rotation churn)
-- DB password: AWS Secrets Manager `analytics-db-password` (auto-rotated)
+- All other secrets (API key, DB password): environment variables loaded
+  via python-dotenv. See .env.example for the full list and SECURITY.md
+  for guidance on when to upgrade specific secrets to AWS Secrets Manager.
 
 Run:
     python -m src.ingest London
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 import boto3
 import requests
 
-from src.secrets_loader import env, secret
+from src.secrets_loader import env
 
 
 # ---------------------------------------------------------------------------
@@ -85,10 +86,10 @@ def publish_metric(city: str) -> None:
 
 def write_summary_to_db(city: str, temp_c: float) -> None:
     """Write a one-row summary to the analytics Postgres database."""
-    # DB password fetched at call time from Secrets Manager. Auto-rotation
-    # in Secrets Manager flips the value transparently - this code picks
-    # up the new password on the next invocation (lru_cache TTL aside).
-    db_password = secret("analytics-db-password")
+    # DB password comes from the DB_PASSWORD env var. Loaded lazily here
+    # (not at module import) so unit tests of pure functions can run
+    # without a real password being set in the test environment.
+    db_password = env("DB_PASSWORD")
     dsn = f"postgres://{DB_USER}:{db_password}@{DB_HOST}/{DB_NAME}"
     # The actual psycopg2 / SQLAlchemy call is intentionally stubbed -
     # the focus here is that DB_PASSWORD never appears in source.
